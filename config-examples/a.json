@@ -1,0 +1,8 @@
+{"source":        {"file-name": "config-examples/source.csv",
+                   "file-type": "csv",
+                   "column-names": "header row"},
+ "destination":   {"file-name": "config-examples/destination.csv",
+                   "file-type": "csv",
+                  "column-names": "header row"},
+ "key-columns":   ["name", "id_number"],
+ "value-columns": ["age", "height"]}
