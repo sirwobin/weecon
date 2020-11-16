@@ -1,6 +1,6 @@
 # weecon
 
-A Clojure application for reconciling tabular data sets
+Sir Wobin's Wonderful Weeconciler.  A Clojure application for reconciling tabular data sets.
 
 ## Usage
 

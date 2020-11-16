@@ -9,8 +9,8 @@
 
 (defonce ds (str "jdbc:sqlite:" (-> (java.io.File/createTempFile "weecon" ".db") .getAbsolutePath)))
 
-(defn- columns->sql-list [columns table-prefix]
-  (->> (map #(str table-prefix %) columns)
+(defn- columns->sql-list [columns column_format_str]
+  (->> (map #(format column_format_str %) columns)
        (string/join ", ")))
 
 (defn create-tables [{key-columns :key-columns value-columns :value-columns :as reconciliation-spec}]
@@ -27,15 +27,15 @@
                                                    (flatten [(for [column-name key-columns]
                                                                (str column-name " TEXT NOT NULL"))
                                                              (for [column-name value-columns]
-                                                               [(str "source_" column-name " TEXT NULL")
-                                                                (str "destination_" column-name " TEXT NULL")])
-                                                             (str "PRIMARY KEY (" (columns->sql-list key-columns "") ")")]))
+                                                               [(str "authority_" column-name " TEXT NULL")
+                                                                (str "test_" column-name " TEXT NULL")])
+                                                             (str "PRIMARY KEY (" (columns->sql-list key-columns "%s") ")")]))
                                       ")")]
-    (->> "source"
+    (->> "authority"
       (format create-table-sql-pattern)
       (conj [])
       (jdbc/execute! ds))
-    (->> "destination"
+    (->> "test"
       (format create-table-sql-pattern)
       (conj [])
       (jdbc/execute! ds))
@@ -49,45 +49,70 @@
     (jdbc.sql/insert-multi! ds table columns contents)))
 
 (defn reconciliation [{key-columns :key-columns value-columns :value-columns :as reconciliation-spec}]
-  (let [additions-sql (str "SELECT 'added' as weecon_action, "
-                           (columns->sql-list key-columns "b.")
-                           ", "
-                           (columns->sql-list value-columns "b.")
-                           " FROM destination a LEFT OUTER JOIN source b USING ("
-                           (columns->sql-list key-columns "")
-                           ") WHERE b."
-                           (first key-columns))
-        deletions-sql (str "SELECT 'deleted' as weecon_action, "
-                           (columns->sql-list key-columns "b.")
-                           ", "
-                           (columns->sql-list value-columns "b.")
-                           " FROM source a LEFT OUTER JOIN destination b USING ("
-                           (columns->sql-list key-columns "")
-                           ") WHERE b."
-                           (first key-columns))])
+  (let [key-columns-sql-no-prefix    (columns->sql-list key-columns "%s")
+        key-columns-sql-b-prefix     (columns->sql-list key-columns "b.%s")
+        value-columns-sql-b-prefix   (columns->sql-list value-columns "b.%s")
+        additions-sql                (str "INSERT INTO reconciliation ("
+                                          key-columns-sql-no-prefix
+                                          (when (seq value-columns) ",")
+                                          (columns->sql-list value-columns "test_%s")
+                                          ") SELECT 'added' as weecon_action, "
+                                          key-columns-sql-b-prefix
+                                          ", "
+                                          value-columns-sql-b-prefix
+                                          " FROM test a LEFT OUTER JOIN authority b USING ("
+                                          key-columns-sql-no-prefix
+                                          ") WHERE b."
+                                          (first key-columns)
+                                          " IS NULL")
+        deletions-sql                (str "INSERT INTO reconciliation ("
+                                          key-columns-sql-no-prefix
+                                          (when (seq value-columns) ",")
+                                          (columns->sql-list value-columns "authority_%s")
+                                          ") SELECT 'deleted' as weecon_action, "
+                                          key-columns-sql-b-prefix
+                                          ", "
+                                          value-columns-sql-b-prefix
+                                          " FROM authority a LEFT OUTER JOIN test b USING ("
+                                          key-columns-sql-no-prefix
+                                          ") WHERE b."
+                                          (first key-columns)
+                                          " IS NULL")
+        changes-sql                  (str "INSERT INTO reconciliation ("
+                                          key-columns-sql-no-prefix
+                                          (when (seq value-columns) ",")
+                                          (columns->sql-list value-columns "authority_%s")
+                                          (when (seq value-columns) ",")
+                                          (columns->sql-list value-columns "test_%s")
+                                          ") SELECT 'changed' as weecon_action, "
+                                          key-columns-sql-b-prefix
+                                          (when (seq value-columns) ",")
+                                          (columns->sql-list value-columns "a.%1$s as authority_%1$s")
+                                          (when (seq value-columns) ",")
+                                          (columns->sql-list value-columns "b.%1$s as test_%1$s"))])
   (jdbc.sql/query ds))
 
 (comment
   (ns-unmap (find-ns 'weecon.db) 'ds)
   "
 SELECT 'changed' as weecon_action, a.name, a.id_number,
-       a.age as source_age, b.age as destination_age, a.height as source_height, b.height as destination_height
-FROM   source a
-  JOIN destination b USING (name, id_number)
+       a.age as authority_age, b.age as test_age, a.height as authority_height, b.height as test_height
+FROM   authority a
+  JOIN test b USING (name, id_number)
 WHERE  a.age <> b.age
    OR  a.height <> b.height
   "
   "
 SELECT 'added' as weecon_action, b.name, b.id_number,
        b.age, b.height
-FROM   destination a
-  LEFT OUTER JOIN source b USING (name, id_number)
+FROM   test a
+  LEFT OUTER JOIN authority b USING (name, id_number)
 WHERE  b.name IS NULL
   "
-  (create-tables {:source        {:file-name "config-examples/source.csv" :file-type "csv" :column-names "header row"}
-                  :destination   {:file-name "config-examples/destination.csv" :file-type "csv" :column-names "header row"}
+  (create-tables {:authority     {:file-name "config-examples/authority.csv" :file-type "csv" :column-names "header row"}
+                  :test          {:file-name "config-examples/test.csv" :file-type "csv" :column-names "header row"}
                   :key-columns   ["name" "id_number"]
                   :value-columns ["age" "height"]})
-  (import-csv "config-examples/source.csv" "source")
-  (import-csv "config-examples/destination.csv" "destination")
-  (columns->sql-list ["name" "id_number"] "b."))
+  (import-csv "config-examples/authority.csv" "authority")
+  (import-csv "config-examples/test.csv" "test")
+  (columns->sql-list ["name" "id_number"] "b.%s"))
