@@ -113,12 +113,6 @@
     (doseq [stmt (remove nil? [additions-sql deletions-sql changes-sql])]
       (jdbc/execute! ds [stmt]))))
 
-(defn tt []
-  (reconcile!     {:authority     {:file-name "config-examples/authority.csv" :file-type "csv" :column-names "header row"}
-                   :test          {:file-name "config-examples/test.csv" :file-type "csv" :column-names "header row"}
-                   :key-columns   ["name" "id_number"]
-                   :value-columns ["age" "height"]}))
-
 (comment
   (do
     (-> sqlite-filename clojure.java.io/file .delete)
