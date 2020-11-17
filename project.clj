@@ -8,6 +8,7 @@
                  [org.clojure/data.csv           "1.0.0"]
                  [seancorfield/next.jdbc         "1.1.613"]
                  [org.xerial/sqlite-jdbc         "3.32.3.2"]
+                 [prismatic/schema               "1.1.12"]
                  [org.clojure/tools.logging      "1.1.0"]
                  [org.slf4j/slf4j-api            "1.7.30"]
                  [ch.qos.logback/logback-classic "1.2.3"]]
