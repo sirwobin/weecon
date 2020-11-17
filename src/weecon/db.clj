@@ -7,7 +7,8 @@
 
 (Class/forName "org.sqlite.JDBC") ; ensure the sqlite JDBC driver is loaded.
 
-(defonce ds (str "jdbc:sqlite:" (-> (java.io.File/createTempFile "weecon" ".db") .getAbsolutePath)))
+(defonce sqlite-filename (-> (java.io.File/createTempFile "weecon" ".db") .getAbsolutePath))
+(defonce ds (str "jdbc:sqlite:" sqlite-filename))
 
 (defn- columns->sql-list [columns column_format_str]
   (->> (map #(format column_format_str %) columns)
@@ -41,9 +42,14 @@
       (jdbc/execute! ds))
     (jdbc/execute! ds [recon-table-sql])))
 
-(defn import-csv! [file-name table-name & [separator quote]]
+(defmulti import! (fn [table-name data-file-spec] (:file-type data-file-spec)))
+
+(defmethod import! :default [table-name {file-type :file-type}]
+  (throw (Exception. (str "Unknown file type " file-type))))
+
+(defmethod import! "csv" [table-name {file-name :file-name column-names :column-names separator :separator quote-char :quote-char}]
   (let [reader              (io/reader file-name)
-        [header & contents] (csv/read-csv reader :separator (or separator \,) :quote (or quote \"))
+        [header & contents] (csv/read-csv reader :separator (or separator \,) :quote (or quote-char \"))
         table               (keyword table-name)
         columns             (mapv keyword header)]
     (jdbc.sql/insert-multi! ds table columns contents)))
@@ -114,30 +120,17 @@
                    :value-columns ["age" "height"]}))
 
 (comment
-  (ns-unmap (find-ns 'weecon.db) 'ds)
-  "
-SELECT 'changed' as weecon_action, a.name, a.id_number,
-       a.age as authority_age, b.age as test_age, a.height as authority_height, b.height as test_height
-FROM   authority a
-  JOIN test b USING (name, id_number)
-WHERE  a.age <> b.age
-   OR  a.height <> b.height
-  "
-  "
-SELECT 'added' as weecon_action, b.name, b.id_number,
-       b.age, b.height
-FROM   test a
-  LEFT OUTER JOIN authority b USING (name, id_number)
-WHERE  b.name IS NULL
-  "
-  (create-tables! {:authority     {:file-name "config-examples/authority.csv" :file-type "csv" :column-names "header row"}
-                   :test          {:file-name "config-examples/test.csv" :file-type "csv" :column-names "header row"}
-                   :key-columns   ["name" "id_number"]
-                   :value-columns ["age" "height"]})
-  (import-csv! "config-examples/authority.csv" "authority")
-  (import-csv! "config-examples/test.csv" "test")
+  (do
+    (-> sqlite-filename clojure.java.io/file .delete)
+    (ns-unmap (find-ns 'weecon.db) 'sqlite-filename)
+    (ns-unmap (find-ns 'weecon.db) 'ds))
+
+  (def aaa {:authority     {:file-name "config-examples/authority.csv" :file-type "csv" :column-names "header row"}
+            :test          {:file-name "config-examples/test.csv" :file-type "csv" :column-names "header row"}
+            :key-columns   ["name" "id_number"]
+            :value-columns ["age" "height"]})
+  (create-tables! aaa)
+  (import! "authority" (:authority aaa))
+  (import! "test" (:test aaa))
   (columns->sql-list ["name" "id_number"] "b.%s")
-  (reconcile!     {:authority     {:file-name "config-examples/authority.csv" :file-type "csv" :column-names "header row"}
-                   :test          {:file-name "config-examples/test.csv" :file-type "csv" :column-names "header row"}
-                   :key-columns   ["name" "id_number"]
-                   :value-columns ["age" "height"]}))
+  (reconcile! aaa))
