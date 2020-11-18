@@ -42,10 +42,10 @@
       (jdbc/execute! ds))
     (jdbc/execute! ds [recon-table-sql])))
 
-(defmulti import! (fn [table-name data-file-spec] (:file-type data-file-spec)))
+(defmulti import! (fn [table-name data-reader-spec] (:weecon.core/type data-reader-spec)))
 
-(defmethod import! :default [table-name {file-type :file-type}]
-  (throw (Exception. (str "Unknown file type " file-type))))
+(defmethod import! :default [table-name {ds-type :weecon.core/type}]
+  (throw (Exception. (str "Unknown data source type " ds-type))))
 
 (defmethod import! "csv" [table-name {file-name :file-name column-names :column-names separator :separator quote-char :quote-char}]
   (let [reader              (io/reader file-name)

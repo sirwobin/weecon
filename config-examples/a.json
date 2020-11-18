@@ -1,8 +1,8 @@
-{"authority":     {"file-name": "config-examples/source.csv",
-                   "file-type": "csv",
+{"authority":     {"file-name": "config-examples/authority.csv",
+                   "weecon.core/type": "csv",
                    "column-names": "header row"},
- "test":          {"file-name": "config-examples/destination.csv",
-                   "file-type": "csv",
+ "test":          {"file-name": "config-examples/test.csv",
+                   "weecon.core/type": "csv",
                   "column-names": "header row"},
  "key-columns":   ["name", "id_number"],
  "value-columns": ["age", "height"]}

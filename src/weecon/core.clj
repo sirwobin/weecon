@@ -7,22 +7,24 @@
             [weecon.db])
   (:gen-class))
 
-(def data-file-schema {:file-name schema/Str
-                       :file-type (schema/enum "csv")
-                       :column-names (schema/either schema/Str [schema/Str])})
+(def data-reader-schema {:file-name         schema/Str
+                         :weecon.core/type  (schema/enum "csv")
+                         :column-names      (schema/either schema/Str [schema/Str])})
 
-(def reconciliation-spec-schema {:authority     data-file-schema
-                                 :test          data-file-schema
+(def reconciliation-spec-schema {:authority     data-reader-schema
+                                 :test          data-reader-schema
                                  :key-columns   [schema/Str]
                                  :value-columns [schema/Str]})
 
-(defn load-data-reconcile-send-results! [{authority-data-file-spec :authority test-data-file-spec :test :as reconciliation-spec}]
+(defn load-data-reconcile-send-results! [{authority-reader-spec :authority test-reader-spec :test :as reconciliation-spec}]
   (try
     (weecon.db/create-tables! reconciliation-spec)
-    (weecon.db/import! "authority" authority-data-file-spec)
-    (weecon.db/import! "test" test-data-file-spec)
+    (weecon.db/import! "authority" authority-reader-spec)
+    (weecon.db/import! "test" test-reader-spec)
     (weecon.db/reconcile! reconciliation-spec)
 
+    (catch java.io.FileNotFoundException X
+      (->> X .getMessage (println "error:")))
     (catch Exception X
       (println "while attempting the reconciliation: " X))))
 
