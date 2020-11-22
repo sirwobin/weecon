@@ -9,6 +9,7 @@
                  [seancorfield/next.jdbc         "1.1.613"]
                  [org.xerial/sqlite-jdbc         "3.32.3.2"]
                  [prismatic/schema               "1.1.12"]
+                 [com.sun.mail/javax.mail        "1.6.2"]
                  [org.clojure/tools.logging      "1.1.0"]
                  [org.slf4j/slf4j-api            "1.7.30"]
                  [ch.qos.logback/logback-classic "1.2.3"]]
