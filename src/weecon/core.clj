@@ -4,7 +4,8 @@
             [clojure.data.json :as json]
             [schema.core :as schema]
             [schema.utils]
-            [weecon.db])
+            [weecon.db]
+            [weecon.mail])
   (:gen-class))
 
 (def data-reader-schema {:file-name         schema/Str
@@ -14,7 +15,8 @@
 (def reconciliation-spec-schema {:authority     data-reader-schema
                                  :test          data-reader-schema
                                  :key-columns   [schema/Str]
-                                 :value-columns [schema/Str]})
+                                 :value-columns [schema/Str]
+                                 :outputs       [weecon.mail/mail-config-spec-schema]})
 
 (defn load-data-reconcile-send-results! [{authority-reader-spec :authority test-reader-spec :test :as reconciliation-spec}]
   (try

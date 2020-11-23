@@ -113,14 +113,17 @@
     (doseq [stmt (remove nil? [additions-sql deletions-sql changes-sql])]
       (jdbc/execute! ds [stmt]))))
 
+(defn report []
+  (jdbc/execute! ds ["SELECT weecon_action AS \"break-type\", count(*) AS \"count\" FROM reconciliation GROUP BY weecon_action"]))
+
 (comment
   (do
     (-> sqlite-filename clojure.java.io/file .delete)
     (ns-unmap (find-ns 'weecon.db) 'sqlite-filename)
     (ns-unmap (find-ns 'weecon.db) 'ds))
 
-  (def aaa {:authority     {:file-name "config-examples/authority.csv" :file-type "csv" :column-names "header row"}
-            :test          {:file-name "config-examples/test.csv" :file-type "csv" :column-names "header row"}
+  (def aaa {:authority     {:file-name "config-examples/authority.csv" :weecon.core/type "csv" :column-names "header row"}
+            :test          {:file-name "config-examples/test.csv" :weecon.core/type "csv" :column-names "header row"}
             :key-columns   ["name" "id_number"]
             :value-columns ["age" "height"]})
   (create-tables! aaa)
