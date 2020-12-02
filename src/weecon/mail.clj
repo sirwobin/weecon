@@ -5,26 +5,29 @@
   (:import (javax.mail Message Message$RecipientType Session Authenticator PasswordAuthentication Transport)
            (javax.mail.internet InternetAddress MimeMultipart MimeBodyPart)))
 
-(def mail-config-spec-schema {:weecon.output/type                  (schema/eq "smtp-email")
-                              :smtp-server                         schema/Str
-                              :smtp-port                           schema/Str
-                              :to-address                          schema/Str
-                              :from-address                        schema/Str
-                              :subject                             schema/Str
-                              (schema/optional-key :auth-username) schema/Str
-                              (schema/optional-key :auth-password) schema/Str
-                              (schema/optional-key :auth-method)   (schema/eq "tls")})
+(def mail-config-spec-schema {:weecon.output/type                          (schema/eq "smtp-email")
+                              :smtp-server                                 schema/Str
+                              :smtp-port                                   schema/Str
+                              :to-address                                  schema/Str
+                              :from-address                                schema/Str
+                              :subject                                     schema/Str
+                              :attach-evidence                             Boolean
+                              :body-content-type                           (schema/enum "text/html" "text/plain")
+                              (schema/optional-key :auth-username)         schema/Str
+                              (schema/optional-key :auth-password-env-var) schema/Str
+                              (schema/optional-key :auth-method)           (schema/eq "tls")})
 
-(defn- get-session [{smtp-server      :smtp-server
-                     smtp-port        :smtp-port
-                     auth-username    :auth-username
-                     auth-password    :auth-password
-                     auth-method      :auth-method
-                     :or {smtp-port   25}
+(defn- get-session [{smtp-server           :smtp-server
+                     smtp-port             :smtp-port
+                     auth-username         :auth-username
+                     auth-password-env-var :auth-password-env-var
+                     auth-method           :auth-method
+                     :or {smtp-port        25}
                      :as mail-spec}]
   (let [props         (doto (java.util.Properties.)
                         (.put "mail.smtp.host" smtp-server)
                         (.put "mail.smtp.port" smtp-port))
+        auth-password (System/getenv auth-password-env-var)
         authenticator (when auth-method
                         (proxy [Authenticator] []
                           (getPasswordAuthentication [] (PasswordAuthentication. auth-username auth-password))))]
@@ -59,8 +62,13 @@
     (.setContent msg content)
     (Transport/send msg)))
 
-(defmethod weecon.output/send! "smtp-email" [output-spec]
-  (smtp-send output-spec))
+(defmethod weecon.output/send! "smtp-email" [{bct :body-content-type attach-evidence :attach-evidence :as output-spec}
+                                             {html :html text :text path :filename}]
+  (-> (merge  output-spec
+              {:body-content (if (= bct "text/html") html text)}
+              (when attach-evidence
+                {:attach-file-path path}))
+      (smtp-send)))
 
 (comment
   (let [address   (System/getenv "MAIL_ADDRESS")
