@@ -60,6 +60,7 @@
       (.addBodyPart content (doto (MimeBodyPart.)
                               (.attachFile attach-file-path))))
     (.setContent msg content)
+    (println "Sending reconciliation breaks email.")
     (Transport/send msg)))
 
 (defmethod weecon.output/send! "smtp-email" [{bct :body-content-type attach-evidence :attach-evidence :as output-spec}
